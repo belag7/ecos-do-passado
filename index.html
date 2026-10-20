@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ecos do Passado: A Mensagem Perdida - Visual Novel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Special+Elite&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  
+  <style>
+    .font-title { font-family: 'Cinzel', serif; }
+    .font-mono-retro { font-family: 'Special Elite', monospace; }
+    .font-body { font-family: 'Inter', sans-serif; }
+
+    /* CRT & Scanline overlays */
+    .crt::after {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      z-index: 30;
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .fog-container {
+      position: fixed;
+      width: 100vw;
+      height: 100vh;
+      top: 0; left: 0;
+      z-index: 0;
+      overflow: hidden;
+      opacity: 0.18;
+      pointer-events: none;
+    }
+
+    .fog-img {
+      position: absolute;
+      height: 100%;
+      width: 300%;
+      background: radial-gradient(circle, rgba(139, 0, 0, 0.3) 0%, rgba(0,0,0,0) 70%);
+      animation: fogMove 30s infinite linear;
+    }
+
+    @keyframes fogMove {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .crimson-glow {
+      box-shadow: 0 0 35px rgba(139, 0, 0, 0.4), inset 0 0 20px rgba(139, 0, 0, 0.25);
+    }
+
+    .crimson-border {
+      border: 1px solid rgba(139, 0, 0, 0.6);
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #3f0909; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #8b0000; }
+
+    .shake {
+      animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-2px, 0, 0); }
+      20%, 80% { transform: translate3d(4px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+      40%, 60% { transform: translate3d(6px, 0, 0); }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-black text-zinc-300 font-body min-h-screen flex items-center justify-center p-2 sm:p-4 select-none crt overflow-x-hidden">
+
+  <div class="fog-container">
+    <div class="fog-img"></div>
+  </div>
+
+  <main id="gameWrapper" class="relative z-10 w-full max-w-5xl bg-zinc-950/95 crimson-border crimson-glow rounded-xl overflow-hidden flex flex-col my-auto border shadow-2xl backdrop-blur-md">
+    
+    <header class="bg-zinc-900/90 border-b border-red-950/60 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-3">
+        <span class="inline-block w-3 h-3 rounded-full bg-red-600 animate-pulse shadow-[0_0_10px_#dc2626]"></span>
+        <div>
+          <h1 class="font-title text-red-600 font-bold tracking-widest text-sm sm:text-base md:text-lg drop-shadow-[0_0_10px_rgba(139,0,0,0.8)]">
+            ECOS DO PASSADO
+          </h1>
+          <p id="chapterTitle" class="text-[10px] sm:text-xs font-mono-retro text-zinc-400">Prólogo: A Chegada à Mansão Vane</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <button id="audioToggleBtn" onclick="toggleAudio()" class="text-xs font-mono-retro px-3 py-1.5 rounded border border-zinc-800 bg-zinc-900 hover:bg-red-950/40 hover:border-red-900 text-zinc-400 hover:text-red-400 transition-all flex items-center gap-2">
+          <span id="audioIcon">🔇</span> <span id="audioText">ÁUDIO</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="statsBar" class="hidden bg-zinc-900/60 border-b border-zinc-800/80 px-4 py-2 flex flex-wrap items-center justify-between gap-4 text-xs font-mono-retro">
+      <div class="flex items-center gap-2 min-w-[180px]">
+        <span class="text-zinc-400">SANIDADE:</span>
+        <div class="flex-1 h-3 bg-zinc-950 border border-zinc-800 rounded-full overflow-hidden p-0.5">
+          <div id="sanityBar" class="h-full bg-gradient-to-r from-red-800 to-red-500 rounded-full transition-all duration-500" style="width: 100%;"></div>
+        </div>
+        <span id="sanityText" class="text-red-400 font-bold">100%</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-zinc-400">INVENTÁRIO:</span>
+        <div id="inventoryContainer" class="flex gap-1.5 flex-wrap">
+          <span class="text-zinc-600 text-[11px] italic">Vazio</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 sm:p-6 md:p-8 flex flex-col gap-6">
+
+      <section id="characterCreation" class="space-y-6 fade-in max-w-xl mx-auto w-full py-4">
+        <div class="text-center space-y-2">
+          <h2 class="font-title text-2xl sm:text-3xl font-bold text-zinc-100 tracking-wide">REGISTRO DE ARQUIVISTA (1984)</h2>
+          <p class="text-xs sm:text-sm text-zinc-400 font-mono-retro">A Fundação Arquivística de Massachusetts o enviou para restaurar as gravações perdidas do falecido Neurobiólogo Dr. Arthur Vane.</p>
+        </div>
+
+        <div class="space-y-4 bg-zinc-900/60 p-5 rounded-lg border border-zinc-800">
+          <div class="space-y-2">
+            <label for="playerName" class="block text-xs uppercase font-mono-retro tracking-wider text-zinc-400">Seu Nome:</label>
+            <input type="text" id="playerName" value="Morgan" maxlength="20" placeholder="Digite seu nome..." 
+              class="w-full bg-zinc-950 border border-zinc-800 focus:border-red-800 text-zinc-100 px-4 py-3 rounded outline-none transition-all font-mono-retro text-sm focus:ring-1 focus:ring-red-900">
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-xs uppercase font-mono-retro tracking-wider text-zinc-400">Escolha seu Perfil:</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button onclick="selectGender('Feminino')" id="btnFem" class="gender-btn flex items-center justify-center gap-3 p-3 rounded border border-zinc-800 bg-zinc-950 hover:border-red-800 hover:bg-red-950/30 text-zinc-300 transition-all group text-left">
+                <span class="text-xl">👩</span>
+                <div>
+                  <div class="text-sm font-semibold group-hover:text-red-400">Pesquisadora</div>
+                  <div class="text-[10px] text-zinc-500 font-mono-retro">Pronomes: Ela / A</div>
+                </div>
+              </button>
+
+              <button onclick="selectGender('Masculino')" id="btnMasc" class="gender-btn flex items-center justify-center gap-3 p-3 rounded border border-zinc-800 bg-zinc-950 hover:border-red-800 hover:bg-red-950/30 text-zinc-300 transition-all group text-left">
+                <span class="text-xl">👨</span>
+                <div>
+                  <div class="text-sm font-semibold group-hover:text-red-400">Pesquisador</div>
+                  <div class="text-[10px] text-zinc-500 font-mono-retro">Pronomes: Ele / O</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="confirmCharacter()" class="w-full py-4 bg-red-950 hover:bg-red-900 border border-red-800 text-red-200 font-title font-bold text-lg rounded tracking-wider shadow-lg hover:shadow-red-900/40 transition-all active:scale-[0.99]">
+          ENTRAR NA MANSÃO VANE
+        </button>
+      </section>
+
+      <section id="gamePlay" class="hidden flex-col gap-5 fade-in">
+        <div id="sceneIllustration" class="w-full h-48 sm:h-64 md:h-80 rounded-lg bg-zinc-950 border border-zinc-800/80 flex items-center justify-center relative overflow-hidden shadow-inner">
+        </div>
+
+        <div class="bg-zinc-900/90 border border-zinc-800 p-4 sm:p-6 rounded-lg relative min-h-[150px] flex flex-col justify-between shadow-lg">
+          <div id="storyText" class="text-sm sm:text-base leading-relaxed text-zinc-200 font-body space-y-3">
+          </div>
+        </div>
+
+        <div id="choices" class="flex flex-col gap-3">
+        </div>
+      </section>
+
+    </div>
+
+    <footer id="footerBar" class="bg-zinc-900/60 border-t border-zinc-900 px-4 py-2 text-xs font-mono-retro text-zinc-500 flex justify-between items-center">
+  <span id="playerStatus">Investigador: Não Identificado</span>
+  <span class="text-zinc-400">Desenvolvido por <strong class="text-red-500">Isabela Gomes</strong></span>
+  <span class="text-[10px] text-zinc-600">OUTUBRO, 1984</span>
+</footer>
+
+  </main>
+
+  <script>
+    let player = {
+      name: "Morgan",
+      gender: "Feminino",
+      title: "Pesquisadora",
+      pronoun: "a",
+      pronounUpper: "A",
+      sanity: 100,
+      inventory: []
+    };
+
+    let selectedGenderOption = "Feminino";
+    let isAudioMuted = true;
+    let audioContext = null;
+    let ambientDroneGain = null;
+
+    // Sintetizador de Efeitos Sonoros por Web Audio API
+    function playSynthSFX(type = 'click', customFreq = null) {
+      if (isAudioMuted) return;
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+
+        const now = audioContext.currentTime;
+
+        if (type === 'click') {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(customFreq || 300, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          osc.start(now);
+          osc.stop(now + 0.1);
+        } 
+        else if (type === 'jumpscare') {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(100, now);
+          osc.frequency.linearRampToValueAtTime(800, now + 0.15);
+          osc.frequency.exponentialRampToValueAtTime(40, now + 0.6);
+
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          osc.start(now);
+          osc.stop(now + 0.6);
+
+          const wrapper = document.getElementById('gameWrapper');
+          wrapper.classList.add('shake');
+          setTimeout(() => wrapper.classList.remove('shake'), 400);
+        }
+        else if (type === 'heartbeat') {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(60, now);
+          osc.frequency.exponentialRampToValueAtTime(20, now + 0.15);
+
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        }
+        else if (type === 'static') {
+          const bufferSize = audioContext.sampleRate * 0.3;
+          const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const noise = audioContext.createBufferSource();
+          noise.buffer = buffer;
+          const gain = audioContext.createGain();
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+          noise.connect(gain);
+          gain.connect(audioContext.destination);
+          noise.start(now);
+        }
+      } catch (e) {
+        console.warn("Web Audio Error:", e);
+      }
+    }
+
+    function startAmbientHorrorDrone() {
+      if (isAudioMuted) return;
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (ambientDroneGain) return;
+
+        const osc = audioContext.createOscillator();
+        const osc2 = audioContext.createOscillator();
+        ambientDroneGain = audioContext.createGain();
+
+        osc.type = 'sawtooth';
+        osc2.type = 'sine';
+
+        osc.frequency.setValueAtTime(45, audioContext.currentTime);
+        osc2.frequency.setValueAtTime(46.5, audioContext.currentTime);
+
+        ambientDroneGain.gain.setValueAtTime(0.02, audioContext.currentTime);
+
+        osc.connect(ambientDroneGain);
+        osc2.connect(ambientDroneGain);
+        ambientDroneGain.connect(audioContext.destination);
+
+        osc.start();
+        osc2.start();
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      isAudioMuted = !isAudioMuted;
+      const icon = document.getElementById('audioIcon');
+      const text = document.getElementById('audioText');
+
+      if (!isAudioMuted) {
+        icon.innerText = "🔊";
+        text.innerText = "ÁUDIO: ON";
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        audioContext.resume();
+        startAmbientHorrorDrone();
+        playSynthSFX('click', 400);
+      } else {
+        icon.innerText = "🔇";
+        text.innerText = "ÁUDIO: OFF";
+        if (ambientDroneGain) {
+          ambientDroneGain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+          ambientDroneGain = null;
+        }
+      }
+    }
+
+    // Artes Vetoriais em SVG incorporadas para substituir as imagens corrompidas
+    const sceneSVGs = {
+      mansionExterior: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#09090b"/>
+          <path d="M 0 300 L 0 180 L 150 120 L 300 180 L 450 100 L 600 160 L 600 300 Z" fill="#18181b" opacity="0.8"/>
+          <polygon points="220,180 380,180 300,80" fill="#27272a"/>
+          <rect x="270" y="210" width="60" height="90" fill="#09090b" stroke="#7f1d1d" stroke-width="2"/>
+          <rect x="230" y="130" width="30" height="40" fill="#78350f" opacity="0.6"/>
+          <rect x="340" y="130" width="30" height="40" fill="#78350f" opacity="0.6"/>
+          <path d="M0 250 Q 150 270 300 250 T 600 250 L 600 300 L 0 300 Z" fill="#050505"/>
+        </svg>`,
+      foyer: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#0c0a09"/>
+          <polygon points="150,50 450,50 550,300 50,300" fill="#1c1917"/>
+          <polygon points="220,90 380,90 420,300 180,300" fill="#09090b"/>
+          <line x1="150" y1="50" x2="50" y2="300" stroke="#44403c" stroke-width="4"/>
+          <line x1="450" y1="50" x2="550" y2="300" stroke="#44403c" stroke-width="4"/>
+          <circle cx="300" cy="120" r="20" fill="#7f1d1d" opacity="0.5"/>
+        </svg>`,
+      studyDesk: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#050505"/>
+          <rect x="100" y="180" width="400" height="120" fill="#292524" rx="4"/>
+          <rect x="220" y="110" width="160" height="70" fill="#1c1917" stroke="#7f1d1d" stroke-width="1.5"/>
+          <circle cx="250" cy="145" r="15" fill="#ef4444" opacity="0.7"/>
+          <circle cx="350" cy="145" r="15" fill="#ef4444" opacity="0.7"/>
+        </svg>`,
+      basementDoor: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#09090b"/>
+          <path d="M 180 300 L 180 80 Q 300 20 420 80 L 420 300 Z" fill="#18181b" stroke="#7f1d1d" stroke-width="3"/>
+          <line x1="300" y1="50" x2="300" y2="300" stroke="#27272a" stroke-width="2"/>
+          <circle cx="280" cy="180" r="8" fill="#dc2626"/>
+        </svg>`,
+      entityJumpscare: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#450a0a"/>
+          <circle cx="300" cy="150" r="90" fill="#7f1d1d" opacity="0.4" filter="blur(20px)"/>
+          <ellipse cx="260" cy="130" rx="12" ry="25" fill="#000"/>
+          <ellipse cx="340" cy="130" rx="12" ry="25" fill="#000"/>
+          <path d="M 270 200 Q 300 160 330 200 Z" fill="#000"/>
+        </svg>`,
+      secretLab: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#020617"/>
+          <rect x="80" y="100" width="440" height="150" fill="#0f172a" stroke="#1e293b" stroke-width="2"/>
+          <path d="M 100 180 Q 150 120 200 180 T 300 180 T 400 180 T 500 180" fill="none" stroke="#38bdf8" stroke-width="2"/>
+          <circle cx="300" cy="180" r="6" fill="#ef4444" class="animate-ping"/>
+        </svg>`,
+      ritualChamber: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#09090b"/>
+          <polygon points="300,40 500,240 100,240" fill="none" stroke="#7f1d1d" stroke-width="2"/>
+          <circle cx="300" cy="160" r="60" fill="none" stroke="#dc2626" stroke-width="2"/>
+          <circle cx="300" cy="160" r="10" fill="#38bdf8"/>
+        </svg>`,
+      stormyEscape: `
+        <svg class="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+          <rect width="100%" height="100%" fill="#09090b"/>
+          <line x1="100" y1="0" x2="50" y2="300" stroke="#cbd5e1" stroke-width="1.5" opacity="0.6"/>
+          <line x1="300" y1="0" x2="250" y2="300" stroke="#cbd5e1" stroke-width="1.5" opacity="0.6"/>
+          <line x1="500" y1="0" x2="450" y2="300" stroke="#cbd5e1" stroke-width="1.5" opacity="0.6"/>
+          <path d="M 0 240 L 600 260 L 600 300 L 0 300 Z" fill="#1c1917"/>
+        </svg>`
+    };
+
+    function updateSanity(amount) {
+      player.sanity = Math.max(0, Math.min(100, player.sanity + amount));
+      const bar = document.getElementById('sanityBar');
+      const text = document.getElementById('sanityText');
+
+      bar.style.width = player.sanity + '%';
+      text.innerText = player.sanity + '%';
+
+      if (player.sanity < 40) {
+        bar.className = "h-full bg-red-600 animate-pulse rounded-full transition-all duration-500";
+        text.className = "text-red-600 font-bold animate-pulse";
+      } else {
+        bar.className = "h-full bg-gradient-to-r from-red-800 to-red-500 rounded-full transition-all duration-500";
+        text.className = "text-red-400 font-bold";
+      }
+    }
+
+    function addItem(itemName, itemIcon) {
+      if (!player.inventory.some(i => i.name === itemName)) {
+        player.inventory.push({ name: itemName, icon: itemIcon });
+        renderInventory();
+        playSynthSFX('click', 600);
+      }
+    }
+
+    function hasItem(itemName) {
+      return player.inventory.some(i => i.name === itemName);
+    }
+
+    function renderInventory() {
+      const container = document.getElementById('inventoryContainer');
+      if (player.inventory.length === 0) {
+        container.innerHTML = `<span class="text-zinc-600 text-[11px] italic">Vazio</span>`;
+        return;
+      }
+
+      container.innerHTML = player.inventory.map(item => `
+        <div class="flex items-center gap-1 bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded text-[11px] text-zinc-300">
+          <span>${item.icon}</span>
+          <span>${item.name}</span>
+        </div>
+      `).join('');
+    }
+
+    const storyNodes = {
+      start: {
+        chapter: "Capítulo I: A Mensagem na Tempestade",
+        svg: sceneSVGs.mansionExterior,
+        text: () => `A tempestade de outubro ruge sobre as colinas isoladas de Arkham. Você, <strong class="text-red-400">${player.name}</strong>, estaciona seu veículo em frente à colossal Mansão Vane.<br><br>A Fundação contratou você como ${player.title.toLowerCase()} para catalogar o acervo de áudios do falecido Dr. Arthur Vane, um neurobiólogo obsessivo que tentou mapear frequências cerebrais nos anos 70.<br><br>A porta principal de carvalho está entreaberta. O vento uiva pelos vãos da madeira.`,
+        choices: [
+          { text: "🔦 Sacar a lanterna e entrar no hall principal", target: "foyerArrival", sfx: 'click' },
+          { text: "🔍 Dar a volta na mansão para checar as janelas dos fundos", target: "backyardCheck", sfx: 'click' }
+        ]
+      },
+      backyardCheck: {
+        chapter: "Capítulo I: A Mensagem na Tempestade",
+        svg: sceneSVGs.mansionExterior,
+        text: () => `Você caminha pela lama ao redor do jardim abandonado. Sob o clarão de um relâmpago, você percebe um símbolo ocultista gravado em giz vermelho no vidro da estufa, além de pegadas recentes entrando pela porta da cozinha.`,
+        onEnter: () => updateSanity(-10),
+        choices: [
+          { text: "🚪 Entrar pela porta da cozinha nos fundos", target: "kitchenEntry", sfx: 'click' },
+          { text: "⬅️ Voltar rapidamente e entrar pela porta da frente", target: "foyerArrival", sfx: 'click' }
+        ]
+      },
+      kitchenEntry: {
+        chapter: "Capítulo I: A Mensagem na Tempestade",
+        svg: sceneSVGs.foyer,
+        text: () => `A cozinha cheira a mofo e ferro. Sobre a mesa de corte, há uma lanterna de metal funcionando e uma gaveta entreaberta contendo uma pequena chave enferrujada.`,
+        onEnter: () => {
+          addItem("Lanterna", "🔦");
+          addItem("Chave Pequena", "🔑");
+        },
+        choices: [
+          { text: "🚶 Avançar para o hall principal da mansão", target: "foyerArrival", sfx: 'click' }
+        ]
+      },
+      foyerArrival: {
+        chapter: "Capítulo I: A Mensagem na Tempestade",
+        svg: sceneSVGs.foyer,
+        text: () => `O hall de entrada é imenso. Uma grande escadaria dupla conduz ao segundo andar, e sob ela há um enorme retrato do Dr. Vane. Os olhos da pintura parecem seguir cada passo seu.<br><br>Sua lanterna ilumina duas passagens: à esquerda, o Gabinete de Estudos; à direita, um corredor escuro que conduz ao porão.`,
+        onEnter: () => {
+          if (!hasItem("Lanterna")) addItem("Lanterna", "🔦");
+        },
+        choices: [
+          { text: "🚪 Entrar no Gabinete de Estudos do Dr. Vane", target: "studyRoom", sfx: 'click' },
+          { text: "🗝️ Investigar a porta trancada do Porão", target: "basementDoor", sfx: 'click' }
+        ]
+      },
+      studyRoom: {
+        chapter: "Capítulo II: Frequências Proibidas",
+        svg: sceneSVGs.studyDesk,
+        text: () => `O gabinete está exatamente como o doutor o deixou em 1979: papéis espalhados, tomos antigos de anatomia e, no centro da mesa de mogno, um imponente toca-fitas de rolo vintage.<br><br>Subitamente, as luzes do teto piscam e apagam! O toca-fitas liga sozinho com um estalo seco. O rolo gira e uma voz grave ressoa:<br><br><em class="font-mono-retro text-red-300">"${player.name}... se você está ouvindo isso, eu já não pertenço a este plano. A frequência 108.4 MHz não captura sons... ela atrai ELES."</em>`,
+        choices: [
+          { text: "🎧 Ouvir o restante da fita magnética até o fim", target: "listenTapeFull", sfx: 'static' },
+          { text: "📖 Inspecionar o diário de couro sobre a mesa", target: "readJournal", sfx: 'click' },
+          { text: "⏹️ Desligar o toca-fitas imediatamente", target: "stopTape", sfx: 'click' }
+        ]
+      },
+      listenTapeFull: {
+        chapter: "Capítulo II: Frequências Proibidas",
+        svg: sceneSVGs.studyDesk,
+        text: () => `A voz na fita se transforma em um sussurro estridente de múltiplas vozes em sobreposição. Sua cabeça começa a pulsar violentamente. Você sente o cheiro de queimado no ar.<br><br>Você ganha a <strong>Fita #04</strong>, mas sua mente sofre com a ressonância da entidade.`,
+        onEnter: () => {
+          updateSanity(-25);
+          addItem("Fita #04", "📼");
+          playSynthSFX('jumpscare');
+        },
+        choices: [
+          { text: "📖 Pegar o Diário do Doutor e procurar saídas", target: "readJournal", sfx: 'click' }
+        ]
+      },
+      readJournal: {
+        chapter: "Capítulo II: Frequências Proibidas",
+        svg: sceneSVGs.studyDesk,
+        text: () => `Você folheia o diário coberto de poeira. A última página datada de 14 de Outubro de 1979 diz:<br><br><em>"O ritual exige o Medalhão de Prata para selar a frequência no gerador do laboratório subterrâneo. Guardei a Chave de Ferro na biblioteca superior. Quem quer que leia isto... NÃO CONFIAR NAS VOZES."</em>`,
+        onEnter: () => {
+          addItem("Diário do Dr. Vane", "📖");
+        },
+        choices: [
+          { text: "🏛️ Subir para a Biblioteca no segundo andar", target: "libraryRoom", sfx: 'click' },
+          { text: "🔒 Tentar usar a Chave Pequena no Porão", target: "basementDoor", sfx: 'click' }
+        ]
+      },
+      stopTape: {
+        chapter: "Capítulo II: Frequências Proibidas",
+        svg: sceneSVGs.studyDesk,
+        text: () => `Você aperta o botão STOP com força. O silêncio que se segue é ensurdecedor... até que você ouve passos pesados e lentos descendo o corredor do segundo andar em direção à sala.`,
+        choices: [
+          { text: "🚪 Se esconder atrás das cortinas pesadas", target: "hideInCurtains", sfx: 'heartbeat' },
+          { text: "🏃 Correr para o corredor em direção à Biblioteca", target: "libraryRoom", sfx: 'click' }
+        ]
+      },
+      hideInCurtains: {
+        chapter: "Capítulo II: Frequências Proibidas",
+        svg: sceneSVGs.foyer,
+        text: () => `Você prende a respiração. Uma figura alta, sem rosto e cercada por uma névoa estática entra no gabinete. Ela para diante da mesa, pega um dos rolos e desaparece na escuridão.<br><br>Sua sanidade fraqueja ao presenciar o sobrenatural.`,
+        onEnter: () => updateSanity(-15),
+        choices: [
+          { text: "🏛️ Subir cuidadosamente para a Biblioteca", target: "libraryRoom", sfx: 'click' }
+        ]
+      },
+      libraryRoom: {
+        chapter: "Capítulo III: O Selo Oculto",
+        svg: sceneSVGs.foyer,
+        text: () => `A biblioteca possui prateleiras que vão até o teto. No centro da sala, sobre um pedestal de veludo vermelho, repousa um <strong>Medalhão de Prata</strong> gravado com símbolos estranhos.<br><br>Ao lado dele, há uma tranca pesada que exige uma chave ou um código.`,
+        choices: [
+          { 
+            text: "🔑 Usar a Chave Pequena (se tiver)", 
+            target: "unlockMedallion", 
+            sfx: 'click',
+            condition: () => hasItem("Chave Pequena") 
+          },
+          { text: "🔮 Forçar a cúpula de vidro do pedestal", target: "breakPedestal", sfx: 'jumpscare' },
+          { text: "🚪 Voltar ao Porão para examinar a porta trancada", target: "basementDoor", sfx: 'click' }
+        ]
+      },
+      unlockMedallion: {
+        chapter: "Capítulo III: O Selo Oculto",
+        svg: sceneSVGs.ritualChamber,
+        text: () => `A Chave Pequena gira perfeitamente na fechadura de veludo! A cúpula se abre suavemente e você coleta o <strong>Medalhão de Prata</strong>.<br><br>O medalhão emite um calor reconfortante, restaurando parte de sua lucidez.`,
+        onEnter: () => {
+          addItem("Medalhão de Prata", "📿");
+          addItem("Chave do Porão", "🗝️");
+          updateSanity(20);
+        },
+        choices: [
+          { text: "🗝️ Descer para o Porão com a Chave Mestra", target: "basementDoor", sfx: 'click' }
+        ]
+      },
+      breakPedestal: {
+        chapter: "Capítulo III: O Selo Oculto",
+        svg: sceneSVGs.entityJumpscare,
+        text: () => `Você quebra o vidro! Um alarme estridente soa e uma rajada de energia sombria atinge seu peito. Você consegue o Medalhão, mas a entidade agora sabe exatamente onde você está!`,
+        onEnter: () => {
+          addItem("Medalhão de Prata", "📿");
+          addItem("Chave do Porão", "🗝️");
+          updateSanity(-35);
+          playSynthSFX('jumpscare');
+        },
+        choices: [
+          { text: "🏃 Correr em desespero rumo ao Porão!", target: "basementDoor", sfx: 'heartbeat' }
+        ]
+      },
+      basementDoor: {
+        chapter: "Capítulo IV: O Coração da Mansão",
+        svg: sceneSVGs.basementDoor,
+        text: () => `A porta de ferro do porão bloqueia o caminho para as profundezas da mansão. Há marcas de garras do lado de dentro.`,
+        choices: [
+          { 
+            text: "🗝️ Usar a Chave do Porão para abrir", 
+            target: "secretLabRoom", 
+            sfx: 'click',
+            condition: () => hasItem("Chave do Porão") || hasItem("Chave Pequena")
+          },
+          { text: "🏛️ Voltar e buscar a chave no andar superior", target: "foyerArrival", sfx: 'click' }
+        ]
+      },
+      secretLabRoom: {
+        chapter: "Capítulo IV: O Coração da Mansão",
+        svg: sceneSVGs.secretLab,
+        text: () => `Você desce os degraus de pedra úmidos. O porão revela um laboratório secreto repleto de osciloscópios, transmissores de rádio e uma imensa antena central alinhada com o teto.<br><br>No painel principal, um rádio transmissor de alta frequência e um gerador de ondas estão ligados na frequência <strong>108.4 MHz</strong>. A fenda para o Medalhão está piscando em vermelho.`,
+        choices: [
+          { 
+            text: "📿 Inserir o Medalhão de Prata no painel para selar a frequência", 
+            target: "endingBanishing", 
+            sfx: 'click',
+            condition: () => hasItem("Medalhão de Prata")
+          },
+          { text: "📻 Usar o rádio transmissor para pedir socorro policial", target: "radioCallHelp", sfx: 'static' },
+          { text: "💥 Destruir o gerador principal com uma alavanca", target: "destroyGenerator", sfx: 'jumpscare' }
+        ]
+      },
+      endingBanishing: {
+        chapter: "Epílogo: O Banimento da Entidade",
+        svg: sceneSVGs.ritualChamber,
+        text: () => `Você encaixa o Medalhão de Prata no receptáculo central. O gerador emite um pulso de luz azul brilhante! A frequência 108.4 MHz é colapsada instantaneamente.<br><br>Os gritos e sussurros no ar cessam. O nevoeiro negro que cercava a mansão se dissipa. O sol da manhã começa a despontar no horizonte.<br><br><strong class="text-emerald-400 font-title text-xl">FINAL PERFEITO — ${player.name} destruiu a anomalia e salvou o mundo de um horror ancestral!</strong>`,
+        choices: [
+          { text: "🔄 Jogar Novamente (Outros Caminhos)", target: "restart", sfx: 'click' }
+        ]
+      },
+      radioCallHelp: {
+        chapter: "Epílogo: Resgate e Mistério",
+        svg: sceneSVGs.stormyEscape,
+        text: () => `Você ajusta a frequência de emergência e transmite as coordenadas. Pouco tempo depois, sirenes da polícia ecoam pela tempestade.<br><br>Você é resgatad${player.pronoun} com vida, mas a Mansão Vane permanece intacta... e a frequência continua transmitindo nas sombras.<br><br><strong class="text-amber-400 font-title text-xl">FINAL SOBREVIVENTE — Você escapou, mas o mal ainda espreita.</strong>`,
+        choices: [
+          { text: "🔄 Jogar Novamente", target: "restart", sfx: 'click' }
+        ]
+      },
+      destroyGenerator: {
+        chapter: "Epílogo: A Explosão e o Caos",
+        svg: sceneSVGs.entityJumpscare,
+        text: () => `Você golpeia o gerador! Uma enorme explosão de energia estática destrói o laboratório. A mansão desmorona sobre o porão.<br><br>Você sobrevive milagrosamente nos escombros, mas os áudios do Dr. Vane foram vazados para todas as estações de rádio do país.<br><br><strong class="text-purple-400 font-title text-xl">FINAL CAÓTICO — A frequência agora está em todos os lugares.</strong>`,
+        choices: [
+          { text: "🔄 Jogar Novamente", target: "restart", sfx: 'click' }
+        ]
+      },
+      madnessEnding: {
+        chapter: "Epílogo: Loucura Absoluta",
+        svg: sceneSVGs.entityJumpscare,
+        text: () => `Sua sanidade chegou a ZERO. A ilusão toma conta dos seus sentidos. Você não distingue mais a realidade da frequência estática... Você se torna o novo guardião da Mansão Vane.<br><br><strong class="text-red-600 font-title text-xl">GAME OVER — A loucura devorou sua mente.</strong>`,
+        choices: [
+          { text: "🔄 Tentar Novamente", target: "restart", sfx: 'click' }
+        ]
+      }
+    };
+
+    function selectGender(gender) {
+      selectedGenderOption = gender;
+      document.querySelectorAll('.gender-btn').forEach(btn => {
+        btn.classList.remove('border-red-600', 'bg-red-950/40');
+      });
+
+      if (gender === 'Feminino') {
+        document.getElementById('btnFem').classList.add('border-red-600', 'bg-red-950/40');
+      } else {
+        document.getElementById('btnMasc').classList.add('border-red-600', 'bg-red-950/40');
+      }
+      
+      playSynthSFX('click', 220);
+    }
+
+    function confirmCharacter() {
+      const nameInput = document.getElementById('playerName').value.trim();
+      player.name = nameInput !== "" ? nameInput : "Morgan";
+      player.gender = selectedGenderOption;
+      player.sanity = 100;
+      player.inventory = [];
+
+      if (player.gender === 'Feminino') {
+        player.title = "Pesquisadora";
+        player.pronoun = "a";
+        player.pronounUpper = "A";
+      } else {
+        player.title = "Pesquisador";
+        player.pronoun = "o";
+        player.pronounUpper = "O";
+      }
+
+      playSynthSFX('click', 180);
+
+      document.getElementById('characterCreation').classList.add('hidden');
+      document.getElementById('statsBar').classList.remove('hidden');
+      document.getElementById('statsBar').classList.add('flex');
+      document.getElementById('gamePlay').classList.remove('hidden');
+      document.getElementById('gamePlay').classList.add('flex');
+
+      document.getElementById('playerStatus').innerHTML = `Investigador: <strong class="text-red-400">${player.name}</strong> (${player.title})`;
+
+      renderInventory();
+      updateSanity(0);
+      renderNode('start');
+    }
+
+    function renderNode(nodeKey) {
+      if (nodeKey === 'restart') {
+        document.getElementById('characterCreation').classList.remove('hidden');
+        document.getElementById('statsBar').classList.add('hidden');
+        document.getElementById('gamePlay').classList.add('hidden');
+        document.getElementById('gamePlay').classList.remove('flex');
+        return;
+      }
+
+      if (player.sanity <= 0 && nodeKey !== 'madnessEnding') {
+        renderNode('madnessEnding');
+        return;
+      }
+
+      const node = storyNodes[nodeKey];
+
+      if (node.onEnter) {
+        node.onEnter();
+      }
+
+      if (node.chapter) {
+        document.getElementById('chapterTitle').innerText = node.chapter;
+      }
+
+      const sceneEl = document.getElementById('sceneIllustration');
+      sceneEl.innerHTML = node.svg;
+
+      const textEl = document.getElementById('storyText');
+      textEl.innerHTML = typeof node.text === 'function' ? node.text() : node.text;
+
+      const choicesEl = document.getElementById('choices');
+      choicesEl.innerHTML = '';
+
+      node.choices.forEach(choice => {
+        if (choice.condition && !choice.condition()) {
+          return;
+        }
+
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left p-3.5 sm:p-4 rounded-lg bg-zinc-900 hover:bg-red-950/50 border border-zinc-800 hover:border-red-800 text-zinc-200 hover:text-white transition-all font-body text-xs sm:text-sm md:text-base flex items-center justify-between group active:scale-[0.99]";
+        
+        btn.innerHTML = `
+          <span>${choice.text}</span>
+          <span class="text-red-600 opacity-0 group-hover:opacity-100 transition-opacity font-mono-retro">→</span>
+        `;
+
+        btn.onclick = () => {
+          if (choice.sfx) {
+            playSynthSFX(choice.sfx);
+          }
+          renderNode(choice.target);
+        };
+
+        choicesEl.appendChild(btn);
+      });
+    }
+
+    window.onload = function() {
+      selectGender('Feminino');
+    };
+  </script>
+</body>
+</html>
